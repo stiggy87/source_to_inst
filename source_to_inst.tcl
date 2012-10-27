@@ -1,3 +1,5 @@
+package require cmdline
+
 # Name: source_to_inst
 # Description: This script will take in .vhdl/.v file types and identify the top-level instantation
 # of the file and generate a .vho/.veo that a user can use in their design. It will speed-up code
@@ -6,19 +8,29 @@
 # Inputs:
 #	-filetype <vhdl|verilog> : REQUIRED The type of files being checking
 # 	<files> : REQUIRED A list of files to use with absolute pathing
-#
+#	-h|-help : Will printout usage.
 # Outputs:
 #	<path_to_files> : Path to all the .veo/.vho files generated
 #	<generated_files> : All the generated files in the same directory as where the files located
 
-proc source_to_inst { {filetype {}} {files {}} {dhelp {}} } {	
-	if { $filetype == "" || $files == "" } {
-		puts "filetype and/or files are not defined. Please see the -help to see how to use the command"
-	} elseif { $filetype == "" || $files == "" && $dhelp == "-h" || $dhelp == "-help" } {
-		puts "Usage: "
-	}
+proc source_to_inst { args } {	
+	# Set options
+	set ::argv0 "source_to_inst"
+	array set options [::cmdline::getoptions args {
+		{filetype.arg "The type of files being parsed. <verilog|vhdl>"}
+		{files.arg	  "A list of files. These must match -filetype."}	
+		}]
+	# "source_to_inst -filetype <verilog|vhdl> -files <list of files>"
+	
+	# if { [llength $args] == 0 } {
+		# return -code error "source_to_inst -filetype <verilog|vhdl> -files <list of files>"
+		# break; # Not sure if this is needed
+	# }
+	
+	set filetype $options(filetype)
+	set files $options(files)
 		
-	if { $filetype == "verilog" && $files != "" } {
+	if { $filetype == "verilog"} {
 		# Read in the file
 		foreach file $files {
 			set verilog_fid [open $file r]
@@ -81,7 +93,7 @@ proc source_to_inst { {filetype {}} {files {}} {dhelp {}} } {
 			# Repeat for all listed files
 			return "$path/$file_name\.veo"
 		}
-	} elseif { $filetype == "vhdl" && $files != "" } {
+	} elseif { $filetype == "vhdl"} {
 		foreach file $files {
 			# Regex the file and find all top-level definitions
 			# This includes components, etc
@@ -90,11 +102,12 @@ proc source_to_inst { {filetype {}} {files {}} {dhelp {}} } {
 			close $vhdl_fid
 			
 			# Get entity name for component name
-			set entity_line [lsearch -regexp -all -inline $vhdl_lines {entity}]
+			set entity_line [lsearch -nocase -regexp -all -inline $vhdl_lines {entity}]
 			regexp -all {entity\s(.+)(?=\sis)} $entity_line all comp_name
 			
 			# Get port list (This will be difficult since VHDL must have a port per line)
-			set port_list [lsearch -regexp -all -inline $vhdl_lines {(in|out|inout)\sSTD_LOGIC}]
+			set port_list [lsearch -nocase -regexp -all -inline $vhdl_lines {(in|out|inout)\sSTD_LOGIC}]
+			set port_list_final ""
 			foreach port $port_list {
 				lappend port_list_final [string trim $port]
 			}
@@ -105,7 +118,7 @@ proc source_to_inst { {filetype {}} {files {}} {dhelp {}} } {
 			
 			# Generate a template design (format appropriately)
 			set header "--------------------------------------------------\n-- This instantiation template was created from source_to_inst\n--------------------------------------------------\n\n-- BEGIN COPY/CUT for COMPONENT Declaration --\n"
-			set comp_header "COMPONENT $comp_name\n  PORT {\n"
+			set comp_header "COMPONENT $comp_name\n  PORT (\n"
 			set comp_footer "  );\nEND COMPONENT;\n-- END COPY/CUT for COMPONENT Declaration --\n\n"
 			
 			set divider "--------------------------------------------------\n\n-- BEGIN COPY/CUT for INSTANTIATION Template --\n"
@@ -153,10 +166,5 @@ proc source_to_inst { {filetype {}} {files {}} {dhelp {}} } {
 			return "$path/$file_name\.vho"
 		# Repeat for all listed files
 		}
-		# DO NOT REMOVE THE BRACE BELOW! It causes compile issues. NEED TO INVESTIGATE!
-		}
-	} else {
-		puts stderr "filetype and/or files are not defined. Please see the -help to see how to use the command. (VHDL)"
-		#exit 1
 	}
 }
