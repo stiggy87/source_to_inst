@@ -22,13 +22,13 @@ To use the procedure, you need to tell it what type of source file it is Verilog
 
 Example:
 ```tcl
-source_to_inst verilog ./test.v
+source_to_inst -filetype verilog -files ./test.v
 ```
 
 It will produce this output:
 
 ```tcl
-source_to_inst verilog ./test.v
+source_to_inst -filetype verilog -files ./test.v
 ./test.veo
 ```
 
