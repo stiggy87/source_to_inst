@@ -58,7 +58,7 @@ proc source_to_inst { args } {
 			
 			# Generate a template design (format appropriately)
 			set header "///////////////////////////////////////////////////\n// This instantiation template was created from source_to_inst\n///////////////////////////////////////////////////\n// <-- BEGIN COPY/CUT FROM HERE -->\n\n"
-			set module_header "$mod_name #(\n"
+			set module_header "$mod_name your_inst_name(\n"
 			# foreach port $port_list {
 				# set port_declare($port) "\t\.$port\($port\),\n"
 			# }
