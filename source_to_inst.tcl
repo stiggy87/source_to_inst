@@ -168,3 +168,34 @@ proc source_to_inst { args } {
 		}
 	}
 }
+
+# Name: verilog_temp
+# Description: A procedure that is the contains the template information for verilog 
+#
+# Inputs:
+#	<fid> : The output file's fid
+#	<msg> : Text in a list to print out.
+# Outputs:
+#	1 : Success
+#	0 : Fail
+proc verilog_temp { fid { msg{}} } {
+	set header {{///////////////////////////////////////////////////} {// This instantiation template was created from source_to_inst} {///////////////////////////////////////////////////} {// <-- BEGIN COPY/CUT FROM HERE -->\n}
+	set module_header "$mod_name your_inst_name(\n"
+	# foreach port $port_list {
+	# set port_declare($port) "\t\.$port\($port\),\n"
+	set footer {// <-- END COPY/CUT FROM HERE -->}
+
+}
+
+# Name: vhdl_temp
+# Description: A procedure that is the contains the template information for vhdl 
+#
+# Inputs:
+#	<fid> : The output file's fid
+#	<msg> : Text in a list to print out.
+# Outputs:
+#	1 : Success
+#	0 : Fail
+proc vhdl_temp { fid { msg {} } } {
+
+}
