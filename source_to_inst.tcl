@@ -173,18 +173,62 @@ proc source_to_inst { args } {
 # Description: A procedure that is the contains the template information for verilog 
 #
 # Inputs:
-#	<fid> : The output file's fid
-#	<msg> : Text in a list to print out.
+#	<veo_file> : The FID for the veo_file
+#	<mod_name> : Module name
+#	<port_list> : List of all the ports
+#	<param_list> : List of any parameters used (OPTIONAL)
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc verilog_temp { fid { msg{}} } {
-	set header {{///////////////////////////////////////////////////} {// This instantiation template was created from source_to_inst} {///////////////////////////////////////////////////} {// <-- BEGIN COPY/CUT FROM HERE -->\n}
-	set module_header "$mod_name your_inst_name(\n"
-	# foreach port $port_list {
-	# set port_declare($port) "\t\.$port\($port\),\n"
-	set footer {// <-- END COPY/CUT FROM HERE -->}
-
+proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
+	# Define template
+	set template {{///////////////////////////////////////////////////}\
+				  {// This instantiation template was created from source_to_inst}\
+				  {///////////////////////////////////////////////////}\
+				  {// <-- BEGIN COPY/CUT FROM HERE -->\n}}
+	
+	# Add the module name to the template
+	lappend template "$mod_name your_inst_name("
+	
+	# Parameter list
+	# Add any parameter items to template
+	set i [llength $param_list]
+	foreach param $param_list {
+		if { $i == 1 } {
+			lappend template "\t$param == "
+		} else {
+			lappend template "\t$param,\n"
+		}
+	}
+	
+	# Port list
+	# Add ports to template
+	set i [llength $port_list]
+	foreach port $port_list {
+		# regexp out the ACTUAL port
+		regexp -all {(.+)(?=\s\:)} $port all port_final
+		set port_final [string trim $port_final \{\}]
+		if { $i == 1 } {
+			lappend template "\t$port_final => $port_final\n"
+		} else {
+			lappend template "\t$port_final => $port_final,\n"
+		}
+		incr i -1
+	}
+	
+	# Add footer to template
+	lappend template ");\n\n"
+	lappend template {// <-- END COPY/CUT FROM HERE -->}
+	
+	# Print out template
+	foreach line $template {
+		if [catch {puts -nonewline $veo_file $line} msg] {
+			puts stderr $msg
+			return 1
+		} else {
+			return 0
+		}
+	}
 }
 
 # Name: vhdl_temp
