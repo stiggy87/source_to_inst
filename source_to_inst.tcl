@@ -224,22 +224,67 @@ proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
 	foreach line $template {
 		if [catch {puts -nonewline $veo_file $line} msg] {
 			puts stderr $msg
-			return 1
-		} else {
 			return 0
+		} else {
+			return 1
 		}
 	}
+	
+	close $veo_file
 }
 
 # Name: vhdl_temp
 # Description: A procedure that is the contains the template information for vhdl 
 #
 # Inputs:
-#	<fid> : The output file's fid
-#	<msg> : Text in a list to print out.
+# Inputs:
+#	<vho_file> : The FID for the veo_file
+#	<mod_name> : Module name
+#	<port_list> : List of all the ports
+#	<generic_list> : List of any generics used (OPTIONAL)
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc vhdl_temp { fid { msg {} } } {
+proc vhdl_temp { vho_file mod_name port_list {generic_list {}} } {
+	set template "{--------------------------------------------------}\
+				  {-- This instantiation template was created from source_to_inst}\ 
+				  {--------------------------------------------------\n}\
+				  {-- BEGIN COPY/CUT for COMPONENT Declaration --\n}"
+				  
+	lappend template "COMPONENT $comp_name"  
+	lappend template "  GENERIC (\n"
+	
+	# Add the generic list to the template (if there are any)
+	
+	lappend template "  );\n  PORT (\n"
+	
+	# Add the port list to the template
+	
+	lappend template "  );"
+	lappend template "END COMPONENT;"
+	lappend template "-- END COPY/CUT for COMPONENT Declaration --\n\n"
+	lappend template "--------------------------------------------------\n"
+	lappend template "-- BEGIN COPY/CUT for INSTANTIATION Template --"
+	lappend template "your_inst_name : $comp_name"
+	lappend template "GENERIC MAP (\n"
+	
+	# Add the generic list : generic => generic
+	
+	lappend template "  );\n  PORT MAP (\n"
+	
+	# Add the port list : port => port
+	
+	lappend template "  \);"
+	lappend template "-- END COPY/CUT for INSTANTIATION Template --"
 
+	foreach line $template {
+		if [catch {puts -nonewline $veo_file $line} msg] {
+			puts stderr $msg
+			return 0
+		} else {
+			return 1
+	}
+	
+	# Write file to location
+	close $vho_file
 }
