@@ -18,11 +18,11 @@ Then you need to source the file. This is because there is a procedure in the fi
 source <path_to>/source_to_inst.tcl
 ```
 
-To use the procedure, you need to tell it what type of source file it is Verilog or VHDL (mixed is not supported but it will come), and give it a list (including full or relative path) to the files.
+To use the procedure, give it a list (including full or relative path) to the files.
 
 Example:
 ```tcl
-source_to_inst -filetype verilog -files ./test.v
+source_to_inst -files { ./test.v ./test.vhd }
 ```
 
 The test.v contains:
@@ -51,8 +51,9 @@ test_1 your_inst_name(
 
 What the Tclsh will see:
 ```tcl
-source_to_inst -filetype verilog -files ./test.v
+source_to_inst -files { ./test.v ./test.vhd }
 ./test.veo
+./test.vho
 ```
 
-From here you can view the test.veo file and and see the generated instantiation template.
+From here you can view the test.veo or test.vho files and and see the generated instantiation template.
