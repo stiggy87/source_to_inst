@@ -56,15 +56,6 @@ proc source_to_inst { args } {
 			# Regex and find all the ports and their types
 			#	- Collect: Name, Size/length, parameters
 			
-			# Generate a template design (format appropriately)
-			set header "///////////////////////////////////////////////////\n// This instantiation template was created from source_to_inst\n///////////////////////////////////////////////////\n// <-- BEGIN COPY/CUT FROM HERE -->\n\n"
-			set module_header "$mod_name your_inst_name(\n"
-			# foreach port $port_list {
-				# set port_declare($port) "\t\.$port\($port\),\n"
-			# }
-			set module_footer ");\n\n"
-			set footer {// <-- END COPY/CUT FROM HERE -->}
-			
 			# Get path
 			regexp -all {(.+)(?=\/.+.v)} $file all path
 			
@@ -73,22 +64,9 @@ proc source_to_inst { args } {
 			
 			# Populate the template design with data gathered above
 			set veo_file [open "$path/$file_name\.veo" w]
-			puts -nonewline $veo_file "$header"
-			puts -nonewline $veo_file "$module_header"
-			set i [llength $port_list]
-			foreach port $port_list {
-				if { $i == 1 } {
-					puts -nonewline $veo_file "\t\.$port\($port\)\n"
-				} else {
-					puts -nonewline $veo_file "\t\.$port\($port\),\n"
-				}
-				incr i -1
-			}
-			puts -nonewline $veo_file $module_footer
-			puts -nonewline $veo_file $footer
 			
-			# Write file to location
-			close $veo_file
+			# Test of function
+			verilog_temp $veo_file $mod_name $port_list 
 			
 			# Repeat for all listed files
 			return "$path/$file_name\.veo"
@@ -111,20 +89,6 @@ proc source_to_inst { args } {
 			foreach port $port_list {
 				lappend port_list_final [string trim $port]
 			}
-			#puts $port_list_final
-			
-			# Regex and find all the ports and their types
-			#	- Collect: Direction, Name, Size/length, parameters
-			
-			# Generate a template design (format appropriately)
-			set header "--------------------------------------------------\n-- This instantiation template was created from source_to_inst\n--------------------------------------------------\n\n-- BEGIN COPY/CUT for COMPONENT Declaration --\n"
-			set comp_header "COMPONENT $comp_name\n  PORT (\n"
-			set comp_footer "  );\nEND COMPONENT;\n-- END COPY/CUT for COMPONENT Declaration --\n\n"
-			
-			set divider "--------------------------------------------------\n\n-- BEGIN COPY/CUT for INSTANTIATION Template --\n"
-			set inst_header "your_inst_name : $comp_name\n  PORT MAP (\n"
-			set inst_footer "  \);\n"
-			set footer "-- END COPY/CUT for INSTANTIATION Template --"
 			
 			# Get path
 			regexp -all {(.+)(?=\/.+.vhd)} $file all path
@@ -134,34 +98,8 @@ proc source_to_inst { args } {
 			
 			# Populate the template design with data gathered above
 			set vho_file [open "$path/$file_name\.vho" w]
-			puts -nonewline $vho_file $header
-			puts -nonewline $vho_file $comp_header
-			foreach port $port_list_final {
-				puts -nonewline $vho_file "\t$port\n"
-			}
 			
-			puts -nonewline $vho_file $comp_footer
-			puts -nonewline $vho_file $divider
-			puts -nonewline $vho_file $inst_header
-			
-			# Port delecaration: port => port
-			set i [llength $port_list_final]
-			foreach port $port_list_final {
-				# regexp out the ACTUAL port
-				regexp -all {(.+)(?=\s\:)} $port all port_final
-				set port_final [string trim $port_final \{\}]
-				if { $i == 1 } {
-					puts -nonewline $vho_file "\t$port_final => $port_final\n"
-				} else {
-					puts -nonewline $vho_file "\t$port_final => $port_final,\n"
-				}
-				incr i -1
-			}
-			puts -nonewline $vho_file $inst_footer
-			puts -nonewline $vho_file $footer
-			
-			# Write file to location
-			close $vho_file
+			vhdl_temp $vho_file $comp_name $port_list_final 
 			
 			return "$path/$file_name\.vho"
 		# Repeat for all listed files
@@ -182,52 +120,47 @@ proc source_to_inst { args } {
 #	0 : Fail
 proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
 	# Define template
-	set template {{///////////////////////////////////////////////////}\
-				  {// This instantiation template was created from source_to_inst}\
-				  {///////////////////////////////////////////////////}\
-				  {// <-- BEGIN COPY/CUT FROM HERE -->\n}}
+	set template {{///////////////////////////////////////////////////}\ 
+				  {// This instantiation template was created from source_to_inst}\ 
+				  {///////////////////////////////////////////////////}\ 
+				  {// <-- BEGIN COPY/CUT FROM HERE -->} {}}
 	
 	# Add the module name to the template
 	lappend template "$mod_name your_inst_name("
 	
 	# Parameter list
 	# Add any parameter items to template
-	set i [llength $param_list]
-	foreach param $param_list {
-		if { $i == 1 } {
-			lappend template "\t$param == "
-		} else {
-			lappend template "\t$param,\n"
+	if { $param_list != {} } {
+		set i [llength $param_list]
+		foreach param $param_list {
+			if { $i == 1 } {
+				lappend template "\t$param == "
+			} else {
+				lappend template "\t$param,\n"
+			}
 		}
 	}
 	
 	# Port list
 	# Add ports to template
 	set i [llength $port_list]
+
 	foreach port $port_list {
-		# regexp out the ACTUAL port
-		regexp -all {(.+)(?=\s\:)} $port all port_final
-		set port_final [string trim $port_final \{\}]
 		if { $i == 1 } {
-			lappend template "\t$port_final => $port_final\n"
+			lappend template "\t\.$port\($port\)"
 		} else {
-			lappend template "\t$port_final => $port_final,\n"
+			lappend template "\t\.$port\($port\),"
 		}
 		incr i -1
 	}
 	
 	# Add footer to template
-	lappend template ");\n\n"
+	lappend template ");\n"
 	lappend template {// <-- END COPY/CUT FROM HERE -->}
 	
 	# Print out template
 	foreach line $template {
-		if [catch {puts -nonewline $veo_file $line} msg] {
-			puts stderr $msg
-			return 0
-		} else {
-			return 1
-		}
+		puts $veo_file $line
 	}
 	
 	close $veo_file
@@ -239,50 +172,68 @@ proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
 # Inputs:
 # Inputs:
 #	<vho_file> : The FID for the veo_file
-#	<mod_name> : Module name
+#	<comp_name> : Component name
 #	<port_list> : List of all the ports
 #	<generic_list> : List of any generics used (OPTIONAL)
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc vhdl_temp { vho_file mod_name port_list {generic_list {}} } {
-	set template "{--------------------------------------------------}\
-				  {-- This instantiation template was created from source_to_inst}\ 
-				  {--------------------------------------------------\n}\
-				  {-- BEGIN COPY/CUT for COMPONENT Declaration --\n}"
-				  
+proc vhdl_temp { vho_file comp_name port_list {generic_list {}} } {
+	set template {--------------------------------------------------}
+	lappend template {-- This instantiation template was created from source_to_inst}
+	lappend template {--------------------------------------------------}
+	lappend template {-- BEGIN COPY/CUT for COMPONENT Declaration --}
 	lappend template "COMPONENT $comp_name"  
-	lappend template "  GENERIC (\n"
 	
-	# Add the generic list to the template (if there are any)
+	if {$generic_list != {} } {
+		
+		lappend template {  GENERIC (}
+		
+		# Add the generic list to the template (if there are any)
+		lappend template "  \);\n"
+	}
 	
-	lappend template "  );\n  PORT (\n"
+	lappend template "  PORT \("
 	
 	# Add the port list to the template
+	foreach port $port_list {
+		lappend template "\t$port"
+	}
 	
-	lappend template "  );"
-	lappend template "END COMPONENT;"
-	lappend template "-- END COPY/CUT for COMPONENT Declaration --\n\n"
+	lappend template {  );}
+	lappend template {END COMPONENT;}
+	lappend template "-- END COPY/CUT for COMPONENT Declaration --\n"
 	lappend template "--------------------------------------------------\n"
-	lappend template "-- BEGIN COPY/CUT for INSTANTIATION Template --"
+	lappend template {-- BEGIN COPY/CUT for INSTANTIATION Template --}
 	lappend template "your_inst_name : $comp_name"
-	lappend template "GENERIC MAP (\n"
 	
 	# Add the generic list : generic => generic
+	if {$generic_list != {} } {
+		lappend template {GENERIC MAP (}
+		lappend template "  \);\n"
+	}
 	
-	lappend template "  );\n  PORT MAP (\n"
+	lappend template {  PORT MAP (}
 	
 	# Add the port list : port => port
+	set i [llength $port_list]
+	foreach port $port_list {
+		# regexp out the ACTUAL port
+		regexp -all {(.+)(?=\s\:)} $port all port_final
+		set port_final [string trim $port_final \{\}]
+		if { $i == 1 } {
+			lappend template "\t$port_final => $port_final"
+		} else {
+			lappend template "\t$port_final => $port_final,"
+		}
+		incr i -1
+	}
 	
-	lappend template "  \);"
-	lappend template "-- END COPY/CUT for INSTANTIATION Template --"
+	lappend template {  );}
+	lappend template {-- END COPY/CUT for INSTANTIATION Template --}
 
 	foreach line $template {
-		if [catch {puts -nonewline $veo_file $line} msg] {
-			puts stderr $msg
-			return 0
-		} else {
-			return 1
+		puts $vho_file $line
 	}
 	
 	# Write file to location
