@@ -17,7 +17,7 @@ proc source_to_inst { args } {
 	# Set options
 	set ::argv0 "source_to_inst"
 	array set options [::cmdline::getoptions args {
-		{filetype.arg "The type of files being parsed. <verilog|vhdl>"}
+#		{filetype.arg "The type of files being parsed. <verilog|vhdl>"}
 		{files.arg	  "A list of files. These must match -filetype."}	
 		}]
 	# "source_to_inst -filetype <verilog|vhdl> -files <list of files>"
@@ -27,12 +27,33 @@ proc source_to_inst { args } {
 		# break; # Not sure if this is needed
 	# }
 	
-	set filetype $options(filetype)
-	set files $options(files)
+        set files $options(files)
+
+        # Determine filetype from files extensions
+        set verilog_files ""
+        set vhdl_files ""
+        foreach file $files {
+            # if the extension meets the .v"
+            if {[regexp -all {.+\.v(?![hdl])} $file] } {
+                lappend verilog_files $file
+                #puts "Verilog file: $file"
+                set v_type "verilog"
+            } elseif { [regexp -all {(.+\.vhd)|(.+\.vhdl)} $file] } {
+                lappend vhdl_files $file
+                #puts "VHDL file : $file"
+                set vhdl_type "vhdl"
+            } else {
+                puts "$file - Not a valid file."
+            }
+        }	
+        #puts $verilog_files
+        #puts $vhdl_files
 		
-	if { $filetype == "verilog"} {
+	if { $v_type == "verilog"} {
+                #puts "Getting into Verilog..."
 		# Read in the file
-		foreach file $files {
+		foreach file $verilog_files {
+                        #puts $file
 			set verilog_fid [open $file r]
 			set verilog_lines [split [read $verilog_fid] \n]
 			close $verilog_fid
@@ -58,10 +79,10 @@ proc source_to_inst { args } {
 			
 			# Get path
 			regexp -all {(.+)(?=\/.+.v)} $file all path
-			
+
 			# Get file name
 			regexp -all {(?:.+\/)(.+).v} $file all file_name
-			
+
 			# Populate the template design with data gathered above
 			set veo_file [open "$path/$file_name\.veo" w]
 			
@@ -69,10 +90,14 @@ proc source_to_inst { args } {
 			verilog_temp $veo_file $mod_name $port_list 
 			
 			# Repeat for all listed files
-			return "$path/$file_name\.veo"
+			lappend return_val "$path/$file_name\.veo"
 		}
-	} elseif { $filetype == "vhdl"} {
-		foreach file $files {
+	}
+
+        if { $vhdl_type == "vhdl"} {
+                #puts "Getting into VHDL..."
+		foreach file $vhdl_files {
+                        #puts $file
 			# Regex the file and find all top-level definitions
 			# This includes components, etc
 			set vhdl_fid [open $file r]
@@ -101,10 +126,14 @@ proc source_to_inst { args } {
 			
 			vhdl_temp $vho_file $comp_name $port_list_final 
 			
-			return "$path/$file_name\.vho"
+			lappend return_val "$path/$file_name\.vho"
 		# Repeat for all listed files
 		}
 	}
+
+        foreach rval $return_val {
+            puts $rval
+        }
 }
 
 # Name: verilog_temp
@@ -120,10 +149,10 @@ proc source_to_inst { args } {
 #	0 : Fail
 proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
 	# Define template
-	set template {{///////////////////////////////////////////////////}\ 
-				  {// This instantiation template was created from source_to_inst}\ 
-				  {///////////////////////////////////////////////////}\ 
-				  {// <-- BEGIN COPY/CUT FROM HERE -->} {}}
+	set template {///////////////////////////////////////////////////}
+	lappend template {// This instantiation template was created from source_to_inst} 
+	lappend template {///////////////////////////////////////////////////}
+	lappend template {// <-- BEGIN COPY/CUT FROM HERE -->}
 	
 	# Add the module name to the template
 	lappend template "$mod_name your_inst_name("
