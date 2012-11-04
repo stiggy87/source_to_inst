@@ -32,6 +32,8 @@ proc source_to_inst { args } {
         # Determine filetype from files extensions
         set verilog_files ""
         set vhdl_files ""
+        set v_type ""
+        set vhdl_type ""
         foreach file $files {
             # if the extension meets the .v"
             if {[regexp -all {.+\.v(?![hdl])} $file] } {
@@ -59,20 +61,33 @@ proc source_to_inst { args } {
 			close $verilog_fid
 			
 			# Regex the file and find all 'module ()' definitions
-			# Two types of 'module {}' definitions
-			# 1) module ( input , inout, output, etc)
-			# 2) module ( port_1, port_2, etc);\n input,output,inout etc
 			
 			# Get the module name
 			set mod_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
 			regexp -all {module\s(.+)(?=\()} $mod_line all mod_name
-			
+
+                        # Need to setup sorting algo to identify type of instantiation
+                        # Possible solution - search for the module line and identify it from there...
+                        # 1st type of Port List
+                        # module_name (port_1, port_2, port_3, etc);
+                         
 			# Get the port list
 			set port_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
 			regexp -all {module\s.+\((.+)\)} $port_line all port_list
-			
+
+                        # 2nd type of Port list - Need to check file type
+                        # input port_1;
+                        # input port_2; // etc...
+                        set port_line [lsearch -regexp -all -inline $verilog_lines {(input|output|inout|\[.+\]).+}]
+                        set port_line [concat {*}$port_line]
+
+                        # Remove the input|output|inout with bus size
+                        regsub -all {(\s|input|output|inout|\[.+\])} $port_line "" port_list
+
+                        
 			# Delete the commas
 			set port_list [string map {, \ } $port_list]
+                        puts $port_list
 			
 			# Regex and find all the ports and their types
 			#	- Collect: Name, Size/length, parameters
