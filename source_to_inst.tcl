@@ -27,27 +27,27 @@ proc source_to_inst { args } {
 		# break; # Not sure if this is needed
 	# }
 	
-        set files $options(files)
+    set files $options(files)
 
-        # Determine filetype from files extensions
-        set verilog_files ""
-        set vhdl_files ""
-        set v_type ""
-        set vhdl_type ""
-        foreach file $files {
-            # if the extension meets the .v"
-            if {[regexp -all {.+\.v(?![hdl])} $file] } {
-                lappend verilog_files $file
-                #puts "Verilog file: $file"
-                set v_type "verilog"
-            } elseif { [regexp -all {(.+\.vhd)|(.+\.vhdl)} $file] } {
-                lappend vhdl_files $file
-                #puts "VHDL file : $file"
-                set vhdl_type "vhdl"
-            } else {
-                puts "$file - Not a valid file."
-            }
-        }	
+    # Determine filetype from files extensions
+    set verilog_files ""
+    set vhdl_files ""
+    set v_type ""
+    set vhdl_type ""
+    foreach file $files {
+        # if the extension meets the .v"
+        if {[regexp -all {.+\.v(?![hdl])} $file] } {
+            lappend verilog_files $file
+            #puts "Verilog file: $file"
+            set v_type "verilog"
+        } elseif { [regexp -all {(.+\.vhd)|(.+\.vhdl)} $file] } {
+            lappend vhdl_files $file
+            #puts "VHDL file : $file"
+            set vhdl_type "vhdl"
+        } else {
+            puts "$file - Not a valid file."
+        }
+    }	
         #puts $verilog_files
         #puts $vhdl_files
 		
@@ -66,32 +66,42 @@ proc source_to_inst { args } {
 			set mod_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
 			regexp -all {module\s(.+)(?=\()} $mod_line all mod_name
 
-                        # Need to setup sorting algo to identify type of instantiation
-                        # Possible solution - search for the module line and identify it from there...
-                        # 1st type of Port List
-                        # module_name (port_1, port_2, port_3, etc);
-                         
-			# Get the port list
-			set port_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
-			regexp -all {module\s.+\((.+)\)} $port_line all port_list
+            # Need to setup sorting algo to identify type of instantiation
+            # Possible solution - search for the module line and identify it from there...
+            # 1st type of Port List
+            # module_name (port_1, port_2, port_3, etc);
 
-                        # 2nd type of Port list - Need to check file type
-                        # input port_1;
-                        # input port_2; // etc...
-                        set port_line [lsearch -regexp -all -inline $verilog_lines {(input|output|inout|\[.+\]).+}]
-                        set port_line [concat {*}$port_line]
+            # Get the port list
+            set port_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
+            regexp -all {module\s.+\((.+)\)} $port_line all port_list
 
-                        # Remove the input|output|inout with bus size
-                        regsub -all {(\s|input|output|inout|\[.+\])} $port_line "" port_list
+            # 2nd type of Port list - Need to check file type
+            # input port_1;
+            # input port_2; // etc...
+            set port_line [lsearch -regexp -all -inline $verilog_lines {(input|output|inout|\[.+\]).+}]
+            set port_line [concat {*}$port_line]
 
-                        
+            # Remove the input|output|inout with bus size
+            regsub -all {(\s|input|output|inout|\[.+\])} $port_line "" port_list
+
+              
 			# Delete the commas
-			set port_list [string map {, \ } $port_list]
-                        puts $port_list
+			set port_list [string map {, \  ; \ } $port_list]
+            #puts $port_list
 			
-			# Regex and find all the ports and their types
-			#	- Collect: Name, Size/length, parameters
-			
+
+            # Parameter capture
+            set param_list [lsearch -regexp -all -inline $verilog_lines {parameter.+}]
+            #set param_list [concat {*}$param_list]
+            #puts $param_list
+
+            # Remove the parameter keyword
+            array set param_arr {}
+            foreach param $param_list {
+                regexp -all {parameter\s(\w+)\=(.+);} $param all param_key param_val
+                set param_arr($param_key) $param_val
+                #puts "$param_arr($param_key) = $param_val"
+			}
 			# Get path
 			regexp -all {(.+)(?=\/.+.v)} $file all path
 
@@ -102,7 +112,8 @@ proc source_to_inst { args } {
 			set veo_file [open "$path/$file_name\.veo" w]
 			
 			# Test of function
-			verilog_temp $veo_file $mod_name $port_list 
+            #puts "[array size param_arr]"
+			verilog_temp $veo_file $mod_name $port_list param_arr
 			
 			# Repeat for all listed files
 			lappend return_val "$path/$file_name\.veo"
@@ -158,11 +169,13 @@ proc source_to_inst { args } {
 #	<veo_file> : The FID for the veo_file
 #	<mod_name> : Module name
 #	<port_list> : List of all the ports
-#	<param_list> : List of any parameters used (OPTIONAL)
+#	<param_arr> : Array of any parameters used (OPTIONAL)
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
+proc verilog_temp { veo_file mod_name port_list param_arr} {
+    upvar $param_arr pa
+    #puts [array size pa]
 	# Define template
 	set template {///////////////////////////////////////////////////}
 	lappend template {// This instantiation template was created from source_to_inst} 
@@ -170,20 +183,27 @@ proc verilog_temp { veo_file mod_name port_list {param_list {}}} {
 	lappend template {// <-- BEGIN COPY/CUT FROM HERE -->}
 	
 	# Add the module name to the template
-	lappend template "$mod_name your_inst_name("
+	
 	
 	# Parameter list
 	# Add any parameter items to template
-	if { $param_list != {} } {
-		set i [llength $param_list]
-		foreach param $param_list {
+	if { [array size pa] != 0 } {
+		set i [array size pa]
+        #puts $i
+        lappend template "$mod_name #("
+		foreach {key val} [array get pa] {
 			if { $i == 1 } {
-				lappend template "\t$param == "
+				lappend template "\t\.$key\($val\) "
 			} else {
-				lappend template "\t$param,\n"
+				lappend template "\t.$key\($val\), "
 			}
+            incr i -1
 		}
-	}
+
+        lappend template "\t\) your_inst_name \("
+	} else {
+        lappend template "$mod_name your_inst_name("
+    }
 	
 	# Port list
 	# Add ports to template
