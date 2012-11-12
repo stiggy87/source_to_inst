@@ -141,6 +141,14 @@ proc source_to_inst { args } {
 				lappend port_list_final [string trim $port]
 			}
 			
+            # Generic List
+            set generic_list [lsearch -nocase -regexp -all -inline $vhdl_lines {.+\:\=.+}]
+            set generic_final ""
+            foreach generic $generic_list {
+                lappend generic_final [string trim $generic]
+            }
+            
+            #puts $generic_list
 			# Get path
 			regexp -all {(.+)(?=\/.+.vhd)} $file all path
 			
@@ -150,7 +158,7 @@ proc source_to_inst { args } {
 			# Populate the template design with data gathered above
 			set vho_file [open "$path/$file_name\.vho" w]
 			
-			vhdl_temp $vho_file $comp_name $port_list_final 
+			vhdl_temp $vho_file $comp_name $port_list_final $generic_final
 			
 			lappend return_val "$path/$file_name\.vho"
 		# Repeat for all listed files
@@ -245,14 +253,34 @@ proc verilog_temp { veo_file mod_name port_list param_arr} {
 proc vhdl_temp { vho_file comp_name port_list {generic_list {}} } {
 	set template {--------------------------------------------------}
 	lappend template {-- This instantiation template was created from source_to_inst}
-	lappend template {--------------------------------------------------}
+	lappend template "--------------------------------------------------\n"
 	lappend template {-- BEGIN COPY/CUT for COMPONENT Declaration --}
 	lappend template "COMPONENT $comp_name"  
 	
+    set generic_final {}
 	if {$generic_list != {} } {
-		
+		# Remove the generic
+        foreach generic $generic_list {
+            if { [regexp -all -nocase {generic\s\(} $generic]} {
+                regsub -all {generic\s\(} $generic "" gen_temp
+                lappend generic_final [string trim [string map {; \ } $gen_temp]]
+            } else {
+                lappend generic_final [string trim [string map {; \ } $generic]]
+            }
+        }
+        
 		lappend template {  GENERIC (}
 		
+        set i [llength $generic_final]
+        foreach generic $generic_final {
+            if {$i == 1} {
+                lappend template "\t$generic"
+            } else {
+                lappend template "\t$generic;"
+            }
+            incr i -1
+        }
+
 		# Add the generic list to the template (if there are any)
 		lappend template "  \);\n"
 	}
@@ -272,8 +300,19 @@ proc vhdl_temp { vho_file comp_name port_list {generic_list {}} } {
 	lappend template "your_inst_name : $comp_name"
 	
 	# Add the generic list : generic => generic
-	if {$generic_list != {} } {
+	if {$generic_final != {} } {
 		lappend template {GENERIC MAP (}
+        set i [llength $generic_final]
+        foreach generic $generic_final {
+            regexp -all {\w+.+(?=\:)(?!\:=)} $generic gen_post
+            set gen_post [string trim $gen_post]
+            if {$i == 1} {
+                lappend template "\t$gen_post => $gen_post"
+            } else {
+                lappend template "\t$gen_post => $gen_post,"
+            }
+            incr i -1
+        }
 		lappend template "  \);\n"
 	}
 	
