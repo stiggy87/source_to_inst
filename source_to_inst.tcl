@@ -63,10 +63,11 @@ proc source_to_inst { args } {
 			# Regex the file and find all 'module ()' definitions
 			
 			# Get the module name
-			set mod_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)}]
+			set mod_line [lsearch -regexp -all -inline  $verilog_lines {module\s(\w+)}]
             set mod_line [concat {*}$mod_line]
-			regexp -all {module\s(.+)} $mod_line all mod_name
-
+			regexp -all {module\s(\w+)} $mod_line all mod_name
+			#puts $mod_name
+			
             # Need to setup sorting algo to identify type of instantiation
             # Possible solution - search for the module line and identify it from there...
             # 1st type of Port List
@@ -88,7 +89,7 @@ proc source_to_inst { args } {
               
 			# Delete the commas
 			set port_list [string map {, \  ; \ } $port_list]
-            #puts $port_list
+            puts $port_list
 			
 
             # Parameter capture

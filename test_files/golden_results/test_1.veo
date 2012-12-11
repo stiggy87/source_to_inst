@@ -3,7 +3,7 @@
 ///////////////////////////////////////////////////
 // <-- BEGIN COPY/CUT FROM HERE -->
 
-test_1 #(
+test_1 your_inst_name(
 	.port_1(port_1),
 	.port_2(port_2),
 	.port_3(port_3),
