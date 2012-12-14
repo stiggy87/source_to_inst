@@ -55,70 +55,74 @@ proc source_to_inst { args } {
                 #puts "Getting into Verilog..."
 		# Read in the file
 		foreach file $verilog_files {
-                        #puts $file
+            #puts $file
 			set verilog_fid [open $file r]
 			set verilog_lines [split [read $verilog_fid] \n]
 			close $verilog_fid
 			
 			# Regex the file and find all 'module ()' definitions
+			# Count how many "module" lines it finds and put in foreach loop
 			
 			# Get the module name
 			set mod_line [lsearch -regexp -all -inline  $verilog_lines {module\s(\w+)}]
             set mod_line [concat {*}$mod_line]
-			regexp -all {module\s(\w+)} $mod_line all mod_name
+			set mod_count [regexp -all {module\s(\w+)} $mod_line all mod_name];
 			#puts $mod_name
 			
-            # Need to setup sorting algo to identify type of instantiation
-            # Possible solution - search for the module line and identify it from there...
-            # 1st type of Port List
-            # module_name (port_1, port_2, port_3, etc);
-
-            # Get the port list
-            set port_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
-            regexp -all {module\s.+\((.+)\)} $port_line all port_list
-
-            # 2nd type of Port list - Need to check file type
-            # input port_1;
-            # input port_2; // etc...
-            set port_line [lsearch -regexp -all -inline $verilog_lines {(input|output|inout|\[.+\]).+}]
-            set port_line [concat {*}$port_line]
-
-            # Remove the input|output|inout with bus size
-            regsub -all {(\s|input|output|inout|\[.+\])} $port_line "" port_list
-
-              
-			# Delete the commas
-			set port_list [string map {, \  ; \ } $port_list]
-            puts $port_list
+			foreach mod_name [concat {*}[regsub -all {module\s} [regexp -inline -all {module\s\w+} $mod_line] ""]] {
 			
+				# Need to setup sorting algo to identify type of instantiation
+				# Possible solution - search for the module line and identify it from there...
+				# 1st type of Port List
+				# module_name (port_1, port_2, port_3, etc);
 
-            # Parameter capture
-            set param_list [lsearch -regexp -all -inline $verilog_lines {parameter.+}]
-            #set param_list [concat {*}$param_list]
-            #puts $param_list
+				# Get the port list
+				set port_line [lsearch -regexp -all -inline  $verilog_lines {module\s(.+)(?=\()}]
+				regexp -all {module\s.+\((.+)\)} $port_line all port_list
 
-            # Remove the parameter keyword
-            array set param_arr {}
-            foreach param $param_list {
-                regexp -all {parameter\s(\w+)\=(.+);} $param all param_key param_val
-                set param_arr($param_key) $param_val
-                #puts "$param_arr($param_key) = $param_val"
+				# 2nd type of Port list - Need to check file type
+				# input port_1;
+				# input port_2; // etc...
+				set port_line [lsearch -regexp -all -inline $verilog_lines {(input|output|inout|\[.+\]).+}]
+				set port_line [concat {*}$port_line]
+
+				# Remove the input|output|inout with bus size
+				regsub -all {(\s|input|output|inout|\[.+\])} $port_line "" port_list
+
+				  
+				# Delete the commas
+				set port_list [string map {, \  ; \ } $port_list]
+				puts $port_list
+				
+
+				# Parameter capture
+				set param_list [lsearch -regexp -all -inline $verilog_lines {parameter.+}]
+				#set param_list [concat {*}$param_list]
+				#puts $param_list
+
+				# Remove the parameter keyword
+				array set param_arr {}
+				foreach param $param_list {
+					regexp -all {parameter\s(\w+)\=(.+);} $param all param_key param_val
+					set param_arr($param_key) $param_val
+					#puts "$param_arr($param_key) = $param_val"
+				}
+				# Get path
+				regexp -all {(.+)(?=\/.+.v)} $file all path
+
+				# Get file name
+				regexp -all {(?:.+\/)(.+).v} $file all file_name
+
+				# Populate the template design with data gathered above
+				set veo_file [open "$path/$file_name\.veo" w]
+				
+				# Test of function
+				#puts "[array size param_arr]"
+				verilog_temp $veo_file $mod_name $port_list param_arr
+				
+				# Repeat for all listed files
+				lappend return_val "$path/$file_name\.veo"
 			}
-			# Get path
-			regexp -all {(.+)(?=\/.+.v)} $file all path
-
-			# Get file name
-			regexp -all {(?:.+\/)(.+).v} $file all file_name
-
-			# Populate the template design with data gathered above
-			set veo_file [open "$path/$file_name\.veo" w]
-			
-			# Test of function
-            #puts "[array size param_arr]"
-			verilog_temp $veo_file $mod_name $port_list param_arr
-			
-			# Repeat for all listed files
-			lappend return_val "$path/$file_name\.veo"
 		}
 	}
 
