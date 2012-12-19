@@ -68,9 +68,16 @@ proc source_to_inst { args } {
             set mod_line [concat {*}$mod_line]
 			set mod_count [regexp -all {module\s(\w+)} $mod_line all mod_name];
 			#puts $mod_name
+			# Get path
+			regexp -all {(.+)(?=\/.+.v)} $file all path
+
+			# Get file name
+			regexp -all {(?:.+\/)(.+).v} $file all file_name
+			
+			set veo_file [open "$path/$file_name\.veo" w]
 			
 			foreach mod_name [concat {*}[regsub -all {module\s} [regexp -inline -all {module\s\w+} $mod_line] ""]] {
-			
+				#puts $mod_name
 				# Need to setup sorting algo to identify type of instantiation
 				# Possible solution - search for the module line and identify it from there...
 				# 1st type of Port List
@@ -92,7 +99,7 @@ proc source_to_inst { args } {
 				  
 				# Delete the commas
 				set port_list [string map {, \  ; \ } $port_list]
-				puts $port_list
+				#puts $port_list
 				
 
 				# Parameter capture
@@ -107,29 +114,25 @@ proc source_to_inst { args } {
 					set param_arr($param_key) $param_val
 					#puts "$param_arr($param_key) = $param_val"
 				}
-				# Get path
-				regexp -all {(.+)(?=\/.+.v)} $file all path
-
-				# Get file name
-				regexp -all {(?:.+\/)(.+).v} $file all file_name
 
 				# Populate the template design with data gathered above
-				set veo_file [open "$path/$file_name\.veo" w]
 				
 				# Test of function
 				#puts "[array size param_arr]"
-				verilog_temp $veo_file $mod_name $port_list param_arr
+				verilog_temp $veo_file $mod_name $port_list param_arr $mod_count
 				
 				# Repeat for all listed files
-				lappend return_val "$path/$file_name\.veo"
+				incr mod_count -1
 			}
+			
+			lappend return_val "$path/$file_name\.veo"
 		}
 	}
 
         if { $vhdl_type == "vhdl"} {
                 #puts "Getting into VHDL..."
 		foreach file $vhdl_files {
-                        #puts $file
+            #puts $file
 			# Regex the file and find all top-level definitions
 			# This includes components, etc
 			set vhdl_fid [open $file r]
@@ -164,7 +167,7 @@ proc source_to_inst { args } {
 			# Populate the template design with data gathered above
 			set vho_file [open "$path/$file_name\.vho" w]
 			
-			vhdl_temp $vho_file $comp_name $port_list_final $generic_final
+			vhdl_temp $vho_file $comp_name $port_list_final $generic_final 1
 			
 			lappend return_val "$path/$file_name\.vho"
 		# Repeat for all listed files
@@ -184,13 +187,16 @@ proc source_to_inst { args } {
 #	<mod_name> : Module name
 #	<port_list> : List of all the ports
 #	<param_arr> : Array of any parameters used (OPTIONAL)
+#	<mod_count> : # of times a file contains a module, this is to help with files with mulitple
+#				  module instantiations
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc verilog_temp { veo_file mod_name port_list param_arr} {
+proc verilog_temp { veo_file mod_name port_list param_arr mod_count} {
     upvar $param_arr pa
     #puts [array size pa]
 	# Define template
+	
 	set template {///////////////////////////////////////////////////}
 	lappend template {// This instantiation template was created from source_to_inst} 
 	lappend template {///////////////////////////////////////////////////}
@@ -241,7 +247,9 @@ proc verilog_temp { veo_file mod_name port_list param_arr} {
 		puts $veo_file $line
 	}
 	
-	close $veo_file
+	if { $mod_count == 1 } {
+		close $veo_file
+	}
 }
 
 # Name: vhdl_temp
@@ -253,10 +261,12 @@ proc verilog_temp { veo_file mod_name port_list param_arr} {
 #	<comp_name> : Component name
 #	<port_list> : List of all the ports
 #	<generic_list> : List of any generics used (OPTIONAL)
+#	<entity_count> : Counts the # of times an entity is in a file. So far, this is set
+#					 to 1 since no evidence shows this as normal coding practices
 # Outputs:
 #	1 : Success
 #	0 : Fail
-proc vhdl_temp { vho_file comp_name port_list {generic_list {}} } {
+proc vhdl_temp { vho_file comp_name port_list {generic_list {}} entity_count} {
 	set template {--------------------------------------------------}
 	lappend template {-- This instantiation template was created from source_to_inst}
 	lappend template "--------------------------------------------------\n"
@@ -346,5 +356,7 @@ proc vhdl_temp { vho_file comp_name port_list {generic_list {}} } {
 	}
 	
 	# Write file to location
-	close $vho_file
+	if { $entity_count == 1 } {
+		close $vho_file
+	}
 }
